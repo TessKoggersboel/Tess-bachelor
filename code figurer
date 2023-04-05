@@ -1,0 +1,130 @@
+########## figur 1 ##########
+library(latex2exp) 
+library(dplyr)
+
+mu <- matrix(c(0.03, 0.05, 0.06))
+Sigma <- matrix(data=c(c(0.04,0.01,0.01),
+                       c(0.01,0.09,0.01),
+                       c(0.01,0.01,0.16)), byrow = TRUE,ncol=3,nrow=3)
+alpha <- seq(0,1,by=0.01)
+
+mu_p_alpha <- c()
+sigma_p_alpha <- c()
+for (i in 1:length(alpha)){
+  w <- matrix(c(alpha[i],1-alpha[i],0))
+  mu_p_alpha[i] <- t(w) %*% mu # p. 49
+  sigma_p_alpha[i] <- sqrt( t(w) %*% Sigma %*% w   )  # p. 49
+}
+
+n <- nrow(mu)
+ones <- rep(1,n)
+Sigma_inverse <- solve(Sigma) 
+
+A <- t(cbind(mu, ones)) %*% Sigma_inverse %*% cbind(mu, ones) # Equation 3.9 (p. 50)
+
+a <- A[1,1]
+b <- A[1,2]
+c <- A[2,2]
+
+sigma_p_coef <- 1/(a*c-b^2) * c(a, -2*b, c) # Equation 3.11 (p. 51)
+
+sigma_gmv <- sqrt(1/c)  # p. 51
+mu_gmv <- b/c # p. 51
+mu_gmv
+
+mu_p <- seq(0.03, 0.05,by=0.0001)
+sigma_p <- sqrt(sigma_p_coef[1] + sigma_p_coef[2]*mu_p + sigma_p_coef[3]*mu_p^2)
+
+n_upper <- length(mu_p)
+n_lower <- which(mu_p >= mu_gmv)[1]
+
+### Tess plot;
+plot(sigma_p^2,mu_p, xaxt = "n",yaxt = "n" ,type='l', col="hotpink", lty=3, xlab=TeX('$\\sigma_p^2 $'),ylab=TeX('$\\mu_p $'))
+lines(sigma_p[n_lower:n_upper]^2,mu_p[n_lower:n_upper], , col="hotpink", lwd=3)
+points(sigma_gmv^2,mu_gmv,pch = 19, , col="hotpink")
+text(sigma_gmv^2+0.001,mu_gmv,'GMV', lwd=2)
+text(0.040,0.046,'Efficient rand')
+
+
+###### cml plot
+
+
+########## figur 2 ##########
+library(latex2exp) # Latex math in output
+library(dplyr) # For the function near()
+mu <- matrix(c(0.03, 0.05, 0.06))
+Sigma <- matrix(data=c(c(0.04,0.01,0.01),
+                       c(0.01,0.09,0.01),
+                       c(0.01,0.01,0.16)), byrow = TRUE,ncol=3,nrow=3)
+A_function <- function(mu,Sigma){
+  ones <- matrix(rep(1,dim(mu)[1]))
+  return( t(cbind(mu, ones)) %*% solve(Sigma) %*% cbind(mu, ones) ) # A in equation (3.9), p. 50
+}
+A <- A_function(mu,Sigma)
+a <- A[1,1]
+b <- A[1,2]
+c <- A[2,2]
+c(a,-2*b,c)/(a*c-b^2) # 12 -220 1025 # Equation (3.11), p. 51
+mu_gmv <- b/c #A[1,2]/A[2,2] # Center of p. 51
+sigma_gmv <- sqrt(1/c) # sqrt(1/A[2,2]) # Center equation of p. 51
+mu_P <- 0.15
+w <- solve(Sigma) %*% cbind(mu,ones) %*% solve(A) %*% rbind(mu_P,1) # Equation (3.10), p. 50
+mu_P <- seq(0.001,0.2,by=0.001)
+n_upper <- length(mu_P)
+sigma_P_2 <- c()
+for (i in 1:n_upper){
+  sigma_P_2[i] <- cbind(mu_P[i],1) %*% solve(A) %*% t(cbind(mu_P[i],1)) # Equation at the bottom of p. 50
+}
+n_lower <- which(mu_P >= mu_gmv)[1]
+plot(sigma_P_2,mu_P,xaxt = "n",yaxt = "n", type='l',cex=0.3, lty=3,xlab=TeX('$\\sigma_p^2 $'),ylab=TeX('$\\mu_p $'))
+lines(sigma_P_2[n_lower:n_upper],mu_P[n_lower:n_upper])
+minimum_variance_frontier <- function(mu_P=seq(0.001,0.2,by=0.001),mu,Sigma){
+  A_function <- function(mu,Sigma){
+    ones <- matrix(rep(1,dim(mu)[1]))
+    return( t(cbind(mu, ones)) %*% solve(Sigma) %*% cbind(mu, ones) ) # A in equation (3.9), p. 50
+  }
+  A <- A_function(mu,Sigma)
+  
+  mu_P <- seq(0.001,0.2,by=0.001)
+  n_upper <- length(mu_P)
+  
+  sigma_P_2 <- c()
+  for (i in 1:n_upper){
+    sigma_P_2[i] <- cbind(mu_P[i],1) %*% solve(A) %*% t(cbind(mu_P[i],1)) # Equation at the bottom of p. 50
+  }
+  
+  mu_gmv <- A[1,2]/A[2,2] # Center of p. 51
+  
+  n_lower <- which(mu_P >= mu_gmv)[1]
+  
+  plot(sigma_P_2,mu_P,xaxt = "n",yaxt = "n",type='l',cex=0.3, lty=3,xlab=TeX('$\\sigma_p^2 $'),ylab=TeX('$\\mu_p $'))
+  lines(sigma_P_2[n_lower:n_upper],mu_P[n_lower:n_upper])
+}
+lambda <- 20
+mu_opt <- (lambda+220)/2050
+w_opt <- solve(Sigma) %*% cbind(mu,ones) %*% solve(A) %*% rbind(mu_opt,1) # Equation (3.10), p. 50
+sigma_opt_2 <- cbind(mu_opt,1) %*% solve(A) %*% t(cbind(mu_opt,1)) # Equation at the bottom of p. 50
+c <- mu_opt-sigma_opt_2/lambda
+mu_P <- seq(0.00,0.2,by=0.01)
+n_upper <- length(mu_P)
+sigma_lambda_2 <- lambda*(mu_P-c[1])
+n_lower <- which(sigma_lambda_2 >= 0)[1]
+
+lambda_function <- function(lambda=20,mu,Sigma,mu_P=seq(0.001,0.2,by=0.001)){
+  mu_opt <- (lambda+220)/2050
+  sigma_opt_2 <- cbind(mu_opt,1) %*% solve(A) %*% t(cbind(mu_opt,1)) # Equation at the bottom of p. 50
+  c <- mu_opt-sigma_opt_2/lambda
+  
+  n_upper <- length(mu_P)
+  sigma_lambda_2 <- lambda*(mu_P-c[1])
+  n_lower <- which(sigma_lambda_2 >= 0)[1]
+  
+  library(latex2exp)
+  minimum_variance_frontier(mu = mu,Sigma = Sigma)
+  lines(sigma_lambda_2[n_lower:n_upper],mu_P[n_lower:n_upper],col='hotpink',lwd=2)
+  points(sigma_opt_2,mu_opt,pch = 19, )
+}
+lambda_function(22, mu=mu,Sigma=Sigma)
+text(sigma_opt_2+0.55,mu_opt-0.008,'Tangentportefølje', lwd=2)
+text(2,0.15,'CML')
+
